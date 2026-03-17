@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>UNI 150 Day of Service</title>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&display=swap');
 
@@ -104,7 +103,7 @@
     .tab-dot-a { background: var(--accent-a); box-shadow: 0 0 5px var(--accent-a); }
     .tab-dot-b { background: var(--accent-b); box-shadow: 0 0 5px var(--accent-b); }
 
-    .main { display: flex; flex: 1; overflow: hidden; }
+    .main { display: flex; flex: 1; overflow: hidden; position: relative; }
 
     .sidebar {
       width: 290px;
@@ -114,8 +113,39 @@
       flex-direction: column;
       flex-shrink: 0;
       overflow: hidden;
-      z-index: 1000;
+      z-index: 500;
+      transition: transform 0.3s ease, width 0.3s ease;
     }
+
+    .sidebar.hidden {
+      transform: translateX(-100%);
+      width: 0;
+      border-right: none;
+    }
+
+    .sidebar-toggle {
+      position: absolute;
+      top: 50%;
+      left: 290px;
+      transform: translateY(-50%);
+      z-index: 600;
+      width: 22px;
+      height: 48px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: none;
+      border-radius: 0 6px 6px 0;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: left 0.3s ease;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .sidebar-toggle:hover { color: var(--text); background: var(--card); }
+    .sidebar-toggle.collapsed { left: 0; }
 
     .sidebar-header {
       padding: 14px 16px 12px;
@@ -127,18 +157,11 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-    }
-
-    .progress-text {
-      font-size: 10px;
-      color: var(--muted);
-    }
-
-    .progress-bar-wrap {
-      height: 3px;
-      background: var(--border);
       flex-shrink: 0;
     }
+
+    .progress-text { font-size: 10px; color: var(--muted); }
+    .progress-bar-wrap { height: 3px; background: var(--border); flex-shrink: 0; }
 
     .progress-bar-fill {
       height: 3px;
@@ -169,7 +192,6 @@
     .route-item.origin-a { border-left-color: var(--accent-a); }
     .route-item.origin-b { border-left-color: var(--accent-b); }
 
-    /* Completed state */
     .route-item.completed {
       background: var(--done);
       border-left-color: var(--muted) !important;
@@ -181,13 +203,7 @@
       color: var(--muted);
     }
 
-    /* Checkbox */
-    .check-wrap {
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
+    .check-wrap { flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
 
     .check-wrap input[type="checkbox"] {
       appearance: none;
@@ -310,7 +326,6 @@
     }
 
     .popup-maps-btn:hover { background: #1558b0; color: white; }
-
     .leaflet-container { background: #0d0f14; }
   </style>
 </head>
@@ -336,7 +351,7 @@
 </div>
 
 <div class="main">
-  <div class="sidebar">
+  <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <span id="sidebar-label">Origin A — Delivery Stops</span>
       <span class="progress-text" id="progress-text">0 / 0</span>
@@ -346,6 +361,9 @@
     </div>
     <div class="route-list" id="route-list"></div>
   </div>
+
+  <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">&#8249;</button>
+
   <div class="map-panel active" id="panel-a">
     <div id="map-a" class="map-el"></div>
   </div>
@@ -354,6 +372,8 @@
   </div>
 </div>
 
+<!-- Leaflet loaded last so L is guaranteed defined before our script runs -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
   const COLOR_A = "#FF3B3B";
   const COLOR_B = "#3B8EFF";
@@ -364,12 +384,26 @@
   const featuresA = geojson.features.filter(f => f.properties.origin === 'A');
   const featuresB = geojson.features.filter(f => f.properties.origin === 'B');
 
-  let maps              = {};
-  let layers            = { A: [], B: [] };
-  let checked           = { A: [], B: [] };
-  let selectedIndex     = { A: null, B: null };
-  let mapsInitialized   = { A: false, B: false };
-  let currentTab        = 'A';
+  let maps            = {};
+  let layers          = { A: [], B: [] };
+  let checked         = { A: [], B: [] };
+  let selectedIndex   = { A: null, B: null };
+  let mapsInitialized = { A: false, B: false };
+  let currentTab      = 'A';
+  let sidebarOpen     = true;
+
+  function toggleSidebar() {
+    sidebarOpen = !sidebarOpen;
+    const sidebar = document.getElementById('sidebar');
+    const toggle  = document.getElementById('sidebar-toggle');
+    sidebar.classList.toggle('hidden', !sidebarOpen);
+    toggle.classList.toggle('collapsed', !sidebarOpen);
+    toggle.innerHTML = sidebarOpen ? '&#8249;' : '&#8250;';
+    setTimeout(() => {
+      if (maps['A']) maps['A'].invalidateSize();
+      if (maps['B']) maps['B'].invalidateSize();
+    }, 320);
+  }
 
   function darkTiles() {
     return L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -379,24 +413,19 @@
     });
   }
 
-  // ── Teardrop pin SVG ──
   function pinIcon(color, label, isOrigin) {
     const size     = isOrigin ? 36 : 30;
     const fontSize = isOrigin ? 13 : 11;
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size*1.35)}" viewBox="0 0 30 40">
-        <defs>
-          <filter id="sh${label}" x="-30%" y="-20%" width="160%" height="160%">
-            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.5)"/>
-          </filter>
-        </defs>
-        <path d="M15 0 C6.7 0 0 6.7 0 15 C0 26 15 40 15 40 C15 40 30 26 30 15 C30 6.7 23.3 0 15 0 Z"
-              fill="${color}" filter="url(#sh${label})"/>
-        <circle cx="15" cy="14" r="8" fill="white" opacity="0.95"/>
-        <text x="15" y="19" text-anchor="middle"
-              font-family="'Syne',sans-serif" font-weight="800"
-              font-size="${fontSize}" fill="${color}">${label}</text>
-      </svg>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size*1.35)}" viewBox="0 0 30 40">
+      <defs><filter id="sh${label}" x="-30%" y="-20%" width="160%" height="160%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.5)"/>
+      </filter></defs>
+      <path d="M15 0 C6.7 0 0 6.7 0 15 C0 26 15 40 15 40 C15 40 30 26 30 15 C30 6.7 23.3 0 15 0 Z"
+            fill="${color}" filter="url(#sh${label})"/>
+      <circle cx="15" cy="14" r="8" fill="white" opacity="0.95"/>
+      <text x="15" y="19" text-anchor="middle" font-family="'Syne',sans-serif"
+            font-weight="800" font-size="${fontSize}" fill="${color}">${label}</text>
+    </svg>`;
     return L.divIcon({
       html: svg, className: '',
       iconSize:    [size, Math.round(size * 1.35)],
@@ -409,66 +438,52 @@
     return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
   }
 
-  // ── Destination popup ──
   function buildPopup(props, origin, originLabel) {
-    return `
-      <div class="popup-title">${props.destination}</div>
+    return `<div class="popup-title">${props.destination}</div>
       <div class="popup-grid">
         <div class="popup-field">Origin<strong>${origin} — ${originLabel}</strong></div>
         <div class="popup-field">Beds<strong>${props.beds}</strong></div>
         <div class="popup-field">Distance<strong>${props.distance}</strong></div>
         <div class="popup-field">Duration<strong>${props.duration}</strong></div>
       </div>
-      <a class="popup-maps-btn" href="${mapsLink(props.destination)}" target="_blank">
-        &#x1F4CD; Open in Google Maps
-      </a>`;
+      <a class="popup-maps-btn" href="${mapsLink(props.destination)}" target="_blank">&#x1F4CD; Open in Google Maps</a>`;
   }
 
-  // ── Origin popup ──
   function buildOriginPopup(originLabel, address) {
-    return `
-      <div class="popup-title">${originLabel}</div>
+    return `<div class="popup-title">${originLabel}</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">${address}</div>
-      <a class="popup-maps-btn" href="${mapsLink(address)}" target="_blank">
-        &#x1F4CD; Open in Google Maps
-      </a>`;
+      <a class="popup-maps-btn" href="${mapsLink(address)}" target="_blank">&#x1F4CD; Open in Google Maps</a>`;
   }
 
-  // ── Update progress bar ──
   function updateProgress(origin) {
-    const total    = (origin === 'A' ? featuresA : featuresB).length;
-    const done     = checked[origin].filter(Boolean).length;
-    const pct      = total ? Math.round((done / total) * 100) : 0;
+    const total = (origin === 'A' ? featuresA : featuresB).length;
+    const done  = checked[origin].filter(Boolean).length;
+    const pct   = total ? Math.round((done / total) * 100) : 0;
     document.getElementById('progress-text').textContent = `${done} / ${total}`;
     document.getElementById('progress-bar').style.width  = pct + '%';
   }
 
-  // ── Toggle completed state ──
   function toggleChecked(origin, index, isChecked) {
     checked[origin][index] = isChecked;
-
     const item = document.getElementById(`item-${origin}-${index}`);
     if (item) item.classList.toggle('completed', isChecked);
-
-    // Gray out / restore the route line and pin
     if (layers[origin][index]) {
-      const color = isChecked ? GRAY : (origin === 'A' ? COLOR_A : COLOR_B);
+      const color   = isChecked ? GRAY : (origin === 'A' ? COLOR_A : COLOR_B);
       const opacity = isChecked ? 0.35 : 0.85;
       layers[origin][index].line.setStyle({ color, opacity });
-      // Rebuild pin icon with gray or original color
       layers[origin][index].destMarker.setIcon(pinIcon(color, index + 1, false));
     }
-
     updateProgress(origin);
   }
 
-  // ── Build one map ──
   function buildMap(origin) {
     const features    = origin === 'A' ? featuresA : featuresB;
     const color       = origin === 'A' ? COLOR_A : COLOR_B;
     const mapId       = origin === 'A' ? 'map-a' : 'map-b';
     const originLabel = origin === 'A' ? 'UNI Commons' : "Foster's Mattress";
-    const originAddr  = origin === 'A' ? '205 Commons, Cedar Falls, IA 50614' : '5911 University Ave #325, Cedar Falls, IA 50613';
+    const originAddr  = origin === 'A'
+      ? '205 Commons, Cedar Falls, IA 50614'
+      : '5911 University Ave #325, Cedar Falls, IA 50613';
 
     checked[origin] = new Array(features.length).fill(false);
 
@@ -476,7 +491,6 @@
     darkTiles().addTo(m);
     maps[origin] = m;
 
-    // Origin pin with Google Maps link
     if (features.length > 0) {
       const firstCoords  = features[0].geometry.coordinates;
       const originLatLng = [firstCoords[0][1], firstCoords[0][0]];
@@ -508,26 +522,21 @@
     mapsInitialized[origin] = true;
   }
 
-  // ── Select a route ──
   function selectRoute(origin, index) {
     if (selectedIndex[origin] !== null) {
-      const prev = layers[origin][selectedIndex[origin]];
       const prevColor = checked[origin][selectedIndex[origin]] ? GRAY : (origin === 'A' ? COLOR_A : COLOR_B);
-      prev.line.setStyle({ weight: 3, color: prevColor });
+      layers[origin][selectedIndex[origin]].line.setStyle({ weight: 3, color: prevColor });
       document.getElementById(`item-${origin}-${selectedIndex[origin]}`)?.classList.remove('active');
     }
-
     selectedIndex[origin] = index;
     const { line, latlngs } = layers[origin][index];
     line.setStyle({ weight: 5 });
     line.openPopup();
-
     document.getElementById(`item-${origin}-${index}`)?.classList.add('active');
     document.getElementById(`item-${origin}-${index}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
     maps[origin].fitBounds(L.latLngBounds(latlngs), { padding: [40, 40] });
   }
 
-  // ── Build sidebar ──
   function buildSidebar(origin) {
     const features   = origin === 'A' ? featuresA : featuresB;
     const colorClass = origin === 'A' ? 'color-a' : 'color-b';
@@ -535,10 +544,9 @@
     listEl.innerHTML = '';
 
     features.forEach((f, i) => {
-      const props   = f.properties;
-      const isDone  = checked[origin] && checked[origin][i];
-
-      const item = document.createElement('div');
+      const props  = f.properties;
+      const isDone = checked[origin] && checked[origin][i];
+      const item   = document.createElement('div');
       item.className = `route-item origin-${origin.toLowerCase()}${isDone ? ' completed' : ''}`;
       item.id = `item-${origin}-${i}`;
       item.innerHTML = `
@@ -555,25 +563,21 @@
           </div>
         </div>`;
 
-      // Checkbox toggle — stop propagation so it doesn't also select the route
       const chk = item.querySelector('input[type="checkbox"]');
       chk.addEventListener('change', (e) => {
         e.stopPropagation();
         toggleChecked(origin, i, e.target.checked);
       });
-
       item.addEventListener('click', (e) => {
         if (e.target.type === 'checkbox') return;
         selectRoute(origin, i);
       });
-
       listEl.appendChild(item);
     });
 
     updateProgress(origin);
   }
 
-  // ── Switch tabs ──
   function switchTab(origin) {
     currentTab = origin;
     document.getElementById('tab-a').className = 'tab-btn' + (origin === 'A' ? ' active-a' : '');
@@ -582,12 +586,9 @@
     document.getElementById('panel-b').classList.toggle('active', origin === 'B');
     document.getElementById('sidebar-label').textContent =
       origin === 'A' ? 'Origin A — Delivery Stops' : 'Origin B — Delivery Stops';
-
     const bar = document.getElementById('progress-bar');
     bar.className = 'progress-bar-fill ' + (origin === 'A' ? 'color-a' : 'color-b');
-
     buildSidebar(origin);
-
     if (!mapsInitialized[origin]) {
       buildMap(origin);
     } else {
@@ -599,10 +600,8 @@
   const totalBeds = geojson.features.reduce((s, f) => s + f.properties.beds, 0);
   document.getElementById('stat-total').textContent = geojson.features.length;
   document.getElementById('stat-beds').textContent  = totalBeds;
-
   buildMap('A');
   buildSidebar('A');
 </script>
-
 </body>
 </html>
