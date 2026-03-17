@@ -364,6 +364,29 @@
     .popup-maps-btn:hover { background: #FFB81C; color: #4B116F; }
 
     .leaflet-container { background: #1a0a2e; }
+
+    .reset-btn {
+      margin: 10px 14px 14px;
+      padding: 8px 0;
+      width: calc(100% - 28px);
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--muted);
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+
+    .reset-btn:hover {
+      border-color: #FFB81C;
+      color: #FFB81C;
+    }
   </style>
 </head>
 <body>
@@ -403,6 +426,7 @@
       <div class="progress-bar-fill color-a" id="progress-bar"></div>
     </div>
     <div class="route-list" id="route-list"></div>
+    <button class="reset-btn" onclick="resetProgress()">&#x21BA; Reset Progress</button>
   </div>
 
   <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">&#8249;</button>
@@ -517,6 +541,7 @@
       layers[origin][index].destMarker.setIcon(pinIcon(color, index + 1, false, origin));
     }
     updateProgress(origin);
+    saveProgress();
   }
 
   function buildMap(origin) {
@@ -528,7 +553,10 @@
       ? '205 Commons, Cedar Falls, IA 50614'
       : '5911 University Ave #325, Cedar Falls, IA 50613';
 
-    checked[origin] = new Array(features.length).fill(false);
+    // Only initialize if not already set (preserves loaded state)
+    if (!checked[origin] || checked[origin].length !== features.length) {
+      checked[origin] = new Array(features.length).fill(false);
+    }
 
     const m = L.map(mapId, { center: [42.524, -92.445], zoom: 13, zoomControl: true });
     darkTiles().addTo(m);
@@ -560,6 +588,14 @@
       destMarker.on('click', () => selectRoute(origin, i));
 
       layers[origin].push({ line, destMarker, props, latlngs, color });
+    });
+
+    // Re-apply saved checked state to map layers
+    features.forEach((f, i) => {
+      if (checked[origin][i]) {
+        layers[origin][i].line.setStyle({ color: GRAY, opacity: 0.3 });
+        layers[origin][i].destMarker.setIcon(pinIcon(GRAY, i + 1, false, origin));
+      }
     });
 
     mapsInitialized[origin] = true;
@@ -639,9 +675,54 @@
     }
   }
 
+  // ── Save & Restore progress ──
+  const STORAGE_KEY = 'uni150_progress';
+
+  function saveProgress() {
+    const data = {
+      A: checked['A'],
+      B: checked['B'],
+    };
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+  }
+
+  function loadProgress() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return;
+      const data = JSON.parse(raw);
+      if (data.A) checked['A'] = data.A;
+      if (data.B) checked['B'] = data.B;
+    } catch(e) {}
+  }
+
+  function resetProgress() {
+    if (!confirm('Reset all progress? This cannot be undone.')) return;
+    checked['A'] = new Array(featuresA.length).fill(false);
+    checked['B'] = new Array(featuresB.length).fill(false);
+    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
+
+    // Re-apply gray/color to all layers
+    ['A', 'B'].forEach(origin => {
+      const color = origin === 'A' ? COLOR_A : COLOR_B;
+      layers[origin].forEach((layer, i) => {
+        layer.line.setStyle({ color, opacity: 0.85 });
+        layer.destMarker.setIcon(pinIcon(color, i + 1, false, origin));
+      });
+    });
+
+    buildSidebar(currentTab);
+  }
+
   const totalBeds = geojson.features.reduce((s, f) => s + f.properties.beds, 0);
   document.getElementById('stat-total').textContent = geojson.features.length;
   document.getElementById('stat-beds').textContent  = totalBeds;
+
+  // Pre-initialize checked arrays before loading saved state
+  checked['A'] = new Array(featuresA.length).fill(false);
+  checked['B'] = new Array(featuresB.length).fill(false);
+  loadProgress();
+
   buildMap('A');
   buildSidebar('A');
 </script>
