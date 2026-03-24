@@ -440,12 +440,11 @@
   </div>
 </div>
 
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
-  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-database.js";
-
-  const app = initializeApp({
+<!-- Firebase compat SDK (non-module, works with regular scripts) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+<script>
+  firebase.initializeApp({
     apiKey: "AIzaSyAqWpff5aPn2udBK5Ur-B2rYc-O1Fz69YQ",
     authDomain: "uni-day-of-service-150.firebaseapp.com",
     databaseURL: "https://uni-day-of-service-150-default-rtdb.firebaseio.com",
@@ -455,9 +454,13 @@
     appId: "1:725230751654:web:ff1ec38eb1e375c5c74967"
   });
 
-  const db = getDatabase(app);
+  const _db = firebase.database();
+  window._fbSet    = (path, value) => _db.ref(path).set(value);
+  window._fbListen = (path, cb)    => _db.ref(path).on('value', snap => cb(snap.val()));
+</script>
 
-
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
   const COLOR_A = "#FFB81C";
   const COLOR_B = "#c084fc";
   const GRAY    = "#3a3050";
@@ -698,7 +701,9 @@
   function saveProgress() {
     // Save to Firebase for real-time sync across all devices
     const data = { A: checked['A'], B: checked['B'] };
-    set(ref(db, 'progress'), data).catch(e => console.warn('Firebase save failed:', e));
+    if (window._fbSet) {
+      window._fbSet('progress', data).catch(e => console.warn('Firebase save failed:', e));
+    }
     // Show saved indicator
     const ind = document.getElementById('saved-indicator');
     if (ind) {
@@ -710,8 +715,12 @@
 
   function loadProgress() {
     // Listen for real-time updates from Firebase
-    onValue(ref(db, 'progress'), (snapshot) => {
-      const data = snapshot.val();
+    if (!window._fbListen) {
+      console.warn('Firebase not ready yet - retrying in 500ms');
+      setTimeout(loadProgress, 500);
+      return;
+    }
+    window._fbListen('progress', (data) => {
       if (!data) return;
       if (Array.isArray(data.A) && data.A.length === featuresA.length) {
         checked['A'] = data.A;
@@ -771,7 +780,6 @@
   buildSidebar('A');
 
   // Firebase handles persistence — no need for beforeunload save
-
 </script>
 </body>
 </html>
