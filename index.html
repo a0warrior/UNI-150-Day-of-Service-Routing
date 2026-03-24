@@ -421,6 +421,7 @@
     <div class="sidebar-header">
       <span id="sidebar-label">Origin A — Delivery Stops</span>
       <span class="progress-text" id="progress-text">0 / 0</span>
+      <span id="saved-indicator" style="font-size:9px;color:#FFB81C;opacity:0;transition:opacity 0.3s;letter-spacing:0.06em;">SAVED ✓</span>
     </div>
     <div class="progress-bar-wrap">
       <div class="progress-bar-fill color-a" id="progress-bar"></div>
@@ -438,6 +439,29 @@
     <div id="map-b" class="map-el"></div>
   </div>
 </div>
+
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
+  import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyAqWpff5aPn2udBK5Ur-B2rYc-O1Fz69YQ",
+    authDomain: "uni-day-of-service-150.firebaseapp.com",
+    databaseURL: "https://uni-day-of-service-150-default-rtdb.firebaseio.com",
+    projectId: "uni-day-of-service-150",
+    storageBucket: "uni-day-of-service-150.firebasestorage.app",
+    messagingSenderId: "725230751654",
+    appId: "1:725230751654:web:ff1ec38eb1e375c5c74967"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getDatabase(app);
+
+  // Expose db helpers to the global scope so the main script can use them
+  window._fbSet = (path, value) => set(ref(db, path), value);
+  window._fbListen = (path, callback) => onValue(ref(db, path), snapshot => callback(snapshot.val()));
+</script>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
@@ -679,21 +703,54 @@
   const STORAGE_KEY = 'uni150_progress';
 
   function saveProgress() {
-    const data = {
-      A: checked['A'],
-      B: checked['B'],
-    };
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); } catch(e) {}
+    // Save to Firebase for real-time sync across all devices
+    const data = { A: checked['A'], B: checked['B'] };
+    if (window._fbSet) {
+      window._fbSet('progress', data).catch(e => console.warn('Firebase save failed:', e));
+    }
+    // Show saved indicator
+    const ind = document.getElementById('saved-indicator');
+    if (ind) {
+      ind.style.opacity = '1';
+      clearTimeout(ind._t);
+      ind._t = setTimeout(() => { ind.style.opacity = '0'; }, 1500);
+    }
   }
 
   function loadProgress() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const data = JSON.parse(raw);
-      if (data.A) checked['A'] = data.A;
-      if (data.B) checked['B'] = data.B;
-    } catch(e) {}
+    // Listen for real-time updates from Firebase
+    if (!window._fbListen) {
+      console.warn('Firebase not ready yet - retrying in 500ms');
+      setTimeout(loadProgress, 500);
+      return;
+    }
+    window._fbListen('progress', (data) => {
+      if (!data) return;
+      if (Array.isArray(data.A) && data.A.length === featuresA.length) {
+        checked['A'] = data.A;
+      }
+      if (Array.isArray(data.B) && data.B.length === featuresB.length) {
+        checked['B'] = data.B;
+      }
+      // Re-apply state to whichever map is currently visible
+      ['A', 'B'].forEach(origin => {
+        if (!mapsInitialized[origin]) return;
+        const features = origin === 'A' ? featuresA : featuresB;
+        const color    = origin === 'A' ? COLOR_A : COLOR_B;
+        features.forEach((f, i) => {
+          const isDone = checked[origin][i];
+          if (layers[origin][i]) {
+            layers[origin][i].line.setStyle({ color: isDone ? GRAY : color, opacity: isDone ? 0.3 : 0.85 });
+            layers[origin][i].destMarker.setIcon(pinIcon(isDone ? GRAY : color, i + 1, false, origin));
+          }
+          const item = document.getElementById('item-' + origin + '-' + i);
+          if (item) item.classList.toggle('completed', isDone);
+          const chk = document.getElementById('chk-' + origin + '-' + i);
+          if (chk) chk.checked = isDone;
+        });
+        updateProgress(origin);
+      });
+    });
   }
 
   function resetProgress() {
@@ -725,6 +782,8 @@
 
   buildMap('A');
   buildSidebar('A');
+
+  // Firebase handles persistence — no need for beforeunload save
 </script>
 </body>
 </html>
