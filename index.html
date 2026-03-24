@@ -363,6 +363,15 @@
 
     .popup-maps-btn:hover { background: #FFB81C; color: #4B116F; }
 
+    .popup-maps-row {
+      display: flex;
+      gap: 6px;
+    }
+
+    .popup-maps-row .popup-maps-btn {
+      flex: 1;
+    }
+
     .leaflet-container { background: #1a0a2e; }
 
   </style>
@@ -503,6 +512,10 @@
     return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
   }
 
+  function appleMapsLink(address) {
+    return 'https://maps.apple.com/?q=' + encodeURIComponent(address);
+  }
+
   function buildPopup(props, origin, originLabel) {
     return `<div class="popup-title">${props.destination}</div>
       <div class="popup-grid">
@@ -511,13 +524,19 @@
         <div class="popup-field">Distance<strong>${props.distance}</strong></div>
         <div class="popup-field">Duration<strong>${props.duration}</strong></div>
       </div>
-      <a class="popup-maps-btn" href="${mapsLink(props.destination)}" target="_blank">&#x1F4CD; Open in Google Maps</a>`;
+      <div class="popup-maps-row">
+        <a class="popup-maps-btn" href="${mapsLink(props.destination)}" target="_blank">&#x1F4CD; Google Maps</a>
+        <a class="popup-maps-btn" href="${appleMapsLink(props.destination)}" target="_blank">&#x1F4CD; Apple Maps</a>
+      </div>`;
   }
 
   function buildOriginPopup(originLabel, address) {
     return `<div class="popup-title">${originLabel}</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">${address}</div>
-      <a class="popup-maps-btn" href="${mapsLink(address)}" target="_blank">&#x1F4CD; Open in Google Maps</a>`;
+      <div class="popup-maps-row">
+        <a class="popup-maps-btn" href="${mapsLink(address)}" target="_blank">&#x1F4CD; Google Maps</a>
+        <a class="popup-maps-btn" href="${appleMapsLink(address)}" target="_blank">&#x1F4CD; Apple Maps</a>
+      </div>`;
   }
 
   function updateProgress(origin) {
