@@ -365,28 +365,6 @@
 
     .leaflet-container { background: #1a0a2e; }
 
-    .reset-btn {
-      margin: 10px 14px 14px;
-      padding: 8px 0;
-      width: calc(100% - 28px);
-      background: transparent;
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      color: var(--muted);
-      font-family: 'Source Sans 3', sans-serif;
-      font-size: 10px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      cursor: pointer;
-      transition: all 0.15s;
-      flex-shrink: 0;
-    }
-
-    .reset-btn:hover {
-      border-color: #FFB81C;
-      color: #FFB81C;
-    }
   </style>
 </head>
 <body>
@@ -427,7 +405,7 @@
       <div class="progress-bar-fill color-a" id="progress-bar"></div>
     </div>
     <div class="route-list" id="route-list"></div>
-    <button class="reset-btn" onclick="resetProgress()">&#x21BA; Reset Progress</button>
+
   </div>
 
   <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">&#8249;</button>
@@ -747,24 +725,6 @@
         updateProgress(origin);
       });
     });
-  }
-
-  function resetProgress() {
-    if (!confirm('Reset all progress? This cannot be undone.')) return;
-    checked['A'] = new Array(featuresA.length).fill(false);
-    checked['B'] = new Array(featuresB.length).fill(false);
-    try { localStorage.removeItem(STORAGE_KEY); } catch(e) {}
-
-    // Re-apply gray/color to all layers
-    ['A', 'B'].forEach(origin => {
-      const color = origin === 'A' ? COLOR_A : COLOR_B;
-      layers[origin].forEach((layer, i) => {
-        layer.line.setStyle({ color, opacity: 0.85 });
-        layer.destMarker.setIcon(pinIcon(color, i + 1, false, origin));
-      });
-    });
-
-    buildSidebar(currentTab);
   }
 
   const totalBeds = geojson.features.reduce((s, f) => s + f.properties.beds, 0);
