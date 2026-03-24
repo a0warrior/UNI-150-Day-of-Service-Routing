@@ -628,9 +628,8 @@
   document.addEventListener('DOMContentLoaded', function() {
     let authed = false;
     try { authed = localStorage.getItem(_AUTH_KEY) === '1'; } catch(e) {}
-    if (authed) {
-      document.getElementById('password-screen').classList.remove('pw-visible');
-    } else {
+    if (!authed) {
+      document.getElementById('password-screen').classList.add('pw-visible');
       setTimeout(() => {
         const input = document.getElementById('pw-input');
         if (input) input.focus();
