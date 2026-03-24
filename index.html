@@ -668,6 +668,21 @@
     }
   }
 
+  function toggleSidebar() {
+    window._sidebarOpen = !window._sidebarOpen;
+    const sidebar = document.getElementById('sidebar');
+    const toggle  = document.getElementById('sidebar-toggle');
+    sidebar.classList.toggle('hidden', !window._sidebarOpen);
+    toggle.classList.toggle('collapsed', !window._sidebarOpen);
+    toggle.innerHTML = window._sidebarOpen ? '&#8249;' : '&#8250;';
+    setTimeout(() => {
+      if (window._maps && window._maps['A']) window._maps['A'].invalidateSize();
+      if (window._maps && window._maps['B']) window._maps['B'].invalidateSize();
+    }, 320);
+  }
+
+  window._sidebarOpen = true;
+
   function togglePwVisibility() {
     const input  = document.getElementById('pw-input');
     const toggle = document.getElementById('pw-toggle');
@@ -724,6 +739,7 @@
   const featuresB = geojson.features.filter(f => f.properties.origin === 'B');
 
   let maps            = {};
+  window._maps = maps;
   let layers          = { A: [], B: [] };
   let checked         = { A: [], B: [] };
   let selectedIndex   = { A: null, B: null };
@@ -731,18 +747,7 @@
   let currentTab      = 'A';
   let sidebarOpen     = true;
 
-  function toggleSidebar() {
-    sidebarOpen = !sidebarOpen;
-    const sidebar = document.getElementById('sidebar');
-    const toggle  = document.getElementById('sidebar-toggle');
-    sidebar.classList.toggle('hidden', !sidebarOpen);
-    toggle.classList.toggle('collapsed', !sidebarOpen);
-    toggle.innerHTML = sidebarOpen ? '&#8249;' : '&#8250;';
-    setTimeout(() => {
-      if (maps['A']) maps['A'].invalidateSize();
-      if (maps['B']) maps['B'].invalidateSize();
-    }, 320);
-  }
+  // toggleSidebar is in the regular script below
 
   function darkTiles() {
     return L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -778,6 +783,10 @@
     return 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(address);
   }
 
+  function appleMapsLink(address) {
+    return 'https://maps.apple.com/?q=' + encodeURIComponent(address);
+  }
+
   function buildPopup(props, origin, originLabel) {
     return `<div class="popup-title">${props.destination}</div>
       <div class="popup-grid">
@@ -786,13 +795,15 @@
         <div class="popup-field">Distance<strong>${props.distance}</strong></div>
         <div class="popup-field">Duration<strong>${props.duration}</strong></div>
       </div>
-      <a class="popup-maps-btn" href="${mapsLink(props.destination)}" target="_blank">&#x1F4CD; Open in Google Maps</a>`;
+      <a class="popup-maps-btn" href="${mapsLink(props.destination)}" target="_blank">&#x1F4CD; Open in Google Maps</a>
+      <a class="popup-maps-btn apple" href="${appleMapsLink(props.destination)}" target="_blank">&#xF8FF; Open in Apple Maps</a>`;
   }
 
   function buildOriginPopup(originLabel, address) {
     return `<div class="popup-title">${originLabel}</div>
       <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">${address}</div>
-      <a class="popup-maps-btn" href="${mapsLink(address)}" target="_blank">&#x1F4CD; Open in Google Maps</a>`;
+      <a class="popup-maps-btn" href="${mapsLink(address)}" target="_blank">&#x1F4CD; Open in Google Maps</a>
+      <a class="popup-maps-btn apple" href="${appleMapsLink(address)}" target="_blank">&#xF8FF; Open in Apple Maps</a>`;
   }
 
   function updateProgress(origin) {
