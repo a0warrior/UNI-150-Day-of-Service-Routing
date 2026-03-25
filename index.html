@@ -384,6 +384,107 @@
 
     .leaflet-container { background: #1a0a2e; }
 
+    /* ── Origin Card in Sidebar ── */
+    .origin-card {
+      margin: 12px 14px 8px;
+      padding: 12px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .origin-card-label {
+      font-size: 9px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .origin-card-name {
+      font-family: 'Merriweather', serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 2px;
+    }
+
+    .origin-card-addr {
+      font-size: 10px;
+      color: var(--muted);
+      margin-bottom: 10px;
+      line-height: 1.4;
+    }
+
+    .origin-card-btns {
+      display: flex;
+      gap: 6px;
+    }
+
+    .origin-card-btn {
+      flex: 1;
+      padding: 7px 0;
+      border-radius: 5px;
+      font-family: 'Source Sans 3', sans-serif;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      text-decoration: none;
+      text-align: center;
+      transition: all 0.15s;
+      border: 1px solid;
+    }
+
+    .origin-card-btn.google {
+      background: transparent;
+      border-color: #FFB81C;
+      color: #FFB81C;
+    }
+
+    .origin-card-btn.google:hover {
+      background: #FFB81C;
+      color: #1a0a2e;
+    }
+
+    .origin-card-btn.apple {
+      background: transparent;
+      border-color: var(--border);
+      color: var(--muted);
+    }
+
+    .origin-card-btn.apple:hover {
+      border-color: var(--text);
+      color: var(--text);
+    }
+
+    @keyframes originPulse {
+      0%   { transform: translate(-50%, -50%) scale(1);   opacity: 0.7; }
+      70%  { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+      100% { transform: translate(-50%, -50%) scale(2.4); opacity: 0; }
+    }
+
+    .origin-pin-wrap {
+      position: relative;
+      display: inline-block;
+    }
+
+    .origin-pin-wrap::before {
+      content: '';
+      position: absolute;
+      top: 35%;
+      left: 50%;
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--pulse-color, #FFB81C);
+      animation: originPulse 2s ease-out infinite;
+      pointer-events: none;
+      z-index: -1;
+    }
+
 
     /* ══════════════════════════════════════
        PASSWORD SCREEN
@@ -710,6 +811,15 @@
     <div class="progress-bar-wrap">
       <div class="progress-bar-fill color-a" id="progress-bar"></div>
     </div>
+    <div class="origin-card" id="origin-card">
+      <div class="origin-card-label">Pick-up Location</div>
+      <div class="origin-card-name" id="origin-card-name">UNI Commons</div>
+      <div class="origin-card-addr" id="origin-card-addr">205 Commons, Cedar Falls, IA 50614</div>
+      <div class="origin-card-btns">
+        <a class="origin-card-btn google" id="origin-card-google" href="#" target="_blank">&#x1F4CD; Google Maps</a>
+        <a class="origin-card-btn apple"  id="origin-card-apple"  href="#" target="_blank">&#xF8FF; Apple Maps</a>
+      </div>
+    </div>
     <div class="route-list" id="route-list"></div>
 
   </div>
@@ -794,19 +904,30 @@
   }
 
   function pinIcon(color, label, isOrigin, origin) {
-    const size     = isOrigin ? 36 : 30;
-    const fontSize = isOrigin ? 13 : 11;
-    const uid      = (origin || '') + label;  // unique ID per origin+label combo
+    const size     = isOrigin ? 44 : 30;
+    const fontSize = isOrigin ? 14 : 11;
+    const uid      = (origin || '') + label;
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${Math.round(size*1.35)}" viewBox="0 0 30 40">
       <defs><filter id="sh${uid}" x="-30%" y="-20%" width="160%" height="160%">
-        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,0.6)"/>
+        <feDropShadow dx="0" dy="2" stdDeviation="${isOrigin ? 3 : 2}" flood-color="rgba(0,0,0,0.7)"/>
       </filter></defs>
       <path d="M15 0 C6.7 0 0 6.7 0 15 C0 26 15 40 15 40 C15 40 30 26 30 15 C30 6.7 23.3 0 15 0 Z"
             fill="${color}" filter="url(#sh${uid})"/>
-      <circle cx="15" cy="14" r="8" fill="#1a0a2e" opacity="0.95"/>
+      <circle cx="15" cy="14" r="${isOrigin ? 9 : 8}" fill="#1a0a2e" opacity="0.95"/>
       <text x="15" y="19" text-anchor="middle" font-family="'Merriweather',serif"
             font-weight="900" font-size="${fontSize}" fill="${color}">${label}</text>
     </svg>`;
+
+    if (isOrigin) {
+      const wrap = `<div class="origin-pin-wrap" style="--pulse-color:${color}">${svg}</div>`;
+      return L.divIcon({
+        html: wrap, className: '',
+        iconSize:    [size, Math.round(size * 1.35)],
+        iconAnchor:  [size / 2, Math.round(size * 1.35)],
+        popupAnchor: [0, -Math.round(size * 1.35)],
+      });
+    }
+
     return L.divIcon({
       html: svg, className: '',
       iconSize:    [size, Math.round(size * 1.35)],
@@ -933,10 +1054,21 @@
   }
 
   function buildSidebar(origin) {
-    const features   = TABS[origin].features;
+    const tab        = TABS[origin];
+    const features   = tab.features;
     const colorClass = 'color-' + origin.toLowerCase();
     const listEl     = document.getElementById('route-list');
     listEl.innerHTML = '';
+
+    // Update origin card
+    const shortNames = { A: 'UNI Commons', B: "Foster's Mattress", C: 'UNI Commons', D: "Foster's Mattress" };
+    document.getElementById('origin-card-name').textContent  = shortNames[origin];
+    document.getElementById('origin-card-addr').textContent  = tab.addr;
+    document.getElementById('origin-card-google').href = mapsLink(tab.addr);
+    document.getElementById('origin-card-apple').href  = appleMapsLink(tab.addr);
+    // Update origin card button color to match tab
+    document.getElementById('origin-card-google').style.borderColor = tab.color;
+    document.getElementById('origin-card-google').style.color        = tab.color;
 
     features.forEach((f, i) => {
       const props  = f.properties;
